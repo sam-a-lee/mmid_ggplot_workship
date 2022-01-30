@@ -1,0 +1,321 @@
+---
+title: "Using ggplot to visualize data and statistical results "
+author: "Samantha Lee"
+date: "04/01/2022"
+output: powerpoint_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      fig.width=4, fig.height=3)
+```
+
+## Document overview
+
+This document was creating using [R Markdown](http://rmarkdown.rstudio.com). R Markdown is great tool to help organize and annotate your code, thus improving tranferability and reproducability of your methods. Code created in R Markdown can be "knitted" into HTML, PDF, and MS word documents. For this workshop, a corresponding HTML document has been created. Feel free to follow along using either the raw .Rmd document or the HTML document. 
+
+## Workshop overview
+
+The purpose of this workshop is to provide a brief introduction to using the [ggplot package](https://ggplot2.tidyverse.org/index.html) for creating publication-quality figures. The ggplot package is part of the [tidyverse](https://www.tidyverse.org/). We will continue to practice using "[tidy format](https://r4ds.had.co.nz/tidy-data.html)" code in this workshop. This workshop will also demonstrate how to use base R to conduct basic statistical analyses, such as t-tests. Finally, we will practice using ggplot to display data and indicate statistically important information. 
+
+*Disclaimer*: I am not a statistician and this workshop is not intended to teach you how to choose the appropriate statistical approach for your research question. While I am always happy to discuss and help to the best of my ability, I suggest that for more complex statistical questions you consider deferring to the statisticians at the [Centre for Health Care Innovation (CHI)](https://www.chimb.ca/). All RFHS graduate students are entitled to 5 hours of free consultation at the CHI. 
+
+## Data set 
+
+This workshop will use data from the [E. Mick *et. al.* (2020)](https://www.nature.com/articles/s41467-020-19587-y) paper titled *Upper airway gene expression reveals suppressed immune responses to SARS-CoV-2 compared with other respiratory viruses*. Data is provided to you through the MMID github repository and can also be found on the [author's github account](https://github.com/czbiohub/covid19-transcriptomics-pathogenesis-diagnostics-results/tree/master/data). This data set includes gene counts, age, and sex information from 234 patients with acute respiratory infections, including COVID-19. 
+
+## Getting started
+
+First, we must load the R packages that we need to conduct our analyses. I prefer to include these all at the top of my code for easy reference. 
+```{r load_packages, message=F}
+library(tidyverse) # the tidyverse package also loads ggplot2
+library(here) # the here package makes it easier to load and save files through simple directory calling 
+library(ggsignif) # we'll use this package later on to create error bars
+```
+
+Next, we have to read in our data. All of the data is in .csv format.
+```{r data_in}
+# the metadata contains info on the age, sex, and type of viral infection of the patient
+# columns capture metadata, and rows represent each patient 
+metadata <- read.csv(file = here("input_data", "metatable_with_viral_status.csv")) 
+
+# the gene counts file contains the number of transcripts for each gene per each individual
+# columns represent patients, while rows represent gene counts
+genecounts <- read.csv(file = here("input_data", "swab_gene_counts.csv")) 
+```
+
+## ggplot2 
+
+There is a myriad of plot types that are handled by ggplot and base R including line plots, bar plots, box plots, and point plots. Though the syntax of both methods is quite different, you can ultimately obtain the same plot using either method. However, I find the syntax of ggplot is easier to follow, and that the aesthetics of a ggplot are easier to modify. 
+
+### ggplot box plot example 
+
+One of the first things I do when I receive a new data is to visual the data. This provides a quick overview of the information contained, as well as the distribution of data. We'll begin by examining the metadata while learning to use ggplot2. The metadata is already in long-format, so we don't have to do any data pivoting before plotting. 
+
+Let's begin our introduction to ggplot by creating a boxplot illustrating the distribution of age in our data set. 
+```{r ggplot_box}
+# We begin by calling the ggplot functionP: ggplot() which accepts arguments to specify the data and aesthetics (aes) it will use.
+# Instead of specify the dataframe within the ggplot function, you can also "pipe" (%>%) the data in
+# The aes arguement allows us to specify what will be on the X and Y axis. 
+# Since we are making a simple box plot, we only need to specify the Y axis as age. 
+# Finally we have to specify the plotting geom
+# Geoms tell ggplot what type of plot to create 
+# you combine geoms with the ggplot function using the "+" symbol 
+
+metadata %>% # piping the data into ggplot
+  ggplot(aes(y=age)) + # do not use quotes when calling on a column name unless it has a space
+  geom_boxplot() # geom_boxplot specifies a boxplot
+# try removing "boxplot" from the geom specification and see what other plot suggestions pop-up
+```
+
+This is the most basic form of a ggplot. Notice that while it conveys our data, it's not very pretty. Let's examine how to modify the aesthetics of the ggplot to make it more visually appealing. 
+
+First, let's demonstrate how to change the fill and colour of the boxplot. In ggplot, the colour typically refers to the outline of plots and points, while fill corresponds to the colour inside the lines. Colours can be specified either using R colour names or hex values (e.g "#009999"). The list of accetptable R colour names can be accessed by typing colours(). 
+
+![](http://sape.inf.usi.ch/sites/default/files/ggplot2-colour-names.png)
+
+Of note, Base R and most R packages accept both Canadian and American spellings of "colour".
+
+Let's change the fill of our ggplot box plot. This can be accomplished by directly specifying the fill colour inside geom_boxplot().
+```{r ggplot_box_aesthetics_fill}
+ggplot(data = metadata, aes(y=age)) + # this time specify the data directly in ggplot 
+  geom_boxplot(fill  = "grey") # changes to plot aesthetics can be directly specified in the geom
+```
+
+We also have control over the background of ggplots. There are two ways to accomplish this:
+
+1. The first is to change the overall theme of the ggplot. The ggplot package comes with several predefined themes that format all non-data related aesthetics and can be applied using the "+" annotation. To examine the different themes, trying typing "+ theme_" and see what autopopulates. My personal favourite is the class dark-on-light theme_bw().
+
+```{r ggplot_box_aesthetics_themebw}
+ggplot(data = metadata, aes(y=age)) + 
+  geom_boxplot(fill  = "grey") + 
+  theme_bw() # specify the theme
+```
+
+2. An alternate approach is to specify the background colour directly. To do this, we must call on theme using "+ theme()" which allows us to modify individual elements of the plot aesthetic. Inside theme() we can specify that we want to modify the background using "panel.background". We then tell gplot that we want to modify the border or fill of background using "element_rect()". Inside element_rect() we can specify the fill and colour of the background
+
+```{r ggplot_box_aesthetics_theme_background}
+ggplot(data = metadata, aes(y=age)) + 
+  geom_boxplot(fill  = "grey") + 
+  theme(panel.background = element_rect(fill = "white", colour = "black")) # if only specify fill, ggplot will not draw a border
+```
+
+I prefer the former method because I find it to be cleaner. However, we do not necessarily need the panel grid lines. Grid lines can be removed using the theme() element of ggplot. To remove an element from a ggplot, you can call on element_black(). You can chose to remove only major, minor, x, y, or any combination of gridlines
+```{r ggplot_box_aesthetics_themebw_gridlines}
+ggplot(data = metadata, aes(y=age)) + 
+  geom_boxplot(fill  = "grey") + 
+  theme_bw() + 
+  theme(panel.grid = element_blank()) # remove all grid lines
+
+# examine the options that autopopulate when you only enter panel.grid in the theme() element
+```
+
+Our y-axis title should be capitalized. You can axis and modify axis titles by adding labs() to your ggplot. 
+```{r ggplot_box_aesthetics_yaxis}
+ggplot(data = metadata, aes(y=age)) + 
+  geom_boxplot(fill  = "grey") + 
+  theme_bw() + 
+  theme(panel.grid = element_blank()) + 
+  labs(y = "Age") # modify Y axis title 
+```
+
+**Note**: It's not possible to specify subscripts and superscripts in R as you would in a word document. If your axis titles include sub or superscripts you can use the expression() or bquote() function in base R to specify this. 
+
+Our x-axis has been arbitrarily labelled since we provided no information. For this plot, let's label the x-axis with the number of participants. We will specify this direclty in the aes() argument. Additionally, we do not need an axis title for the x-axis. We can remove this by setting axis.title.x=element_blank() in theme(). 
+```{r ggplot_box_aesthetics_xaxis}
+ggplot(data = metadata, aes(y=age, x = "N = 234")) + # specify character name for x to fill in for empty data
+  geom_boxplot(fill  = "grey") + # changes to plot aesthetics can be directly specified in the geom
+  theme_bw() + # specify the theme
+  theme(panel.grid = element_blank(), # remove all grid lines
+        axis.title.x=element_blank()) + # remove x-axis title 
+  labs(y = "Age")
+```
+
+ggplot automatically decides how large/small the axis breaks should be for numeric variables such as age. It's possible to change these values by calling on scale_y_continuous. Let's make our y-axis scale go up by 10 and set the limits to be from 0 to 100.
+```{r ggplot_box_aesthetics_yaxis_breaks}
+ggplot(data = metadata, aes(y=age, x = "N = 234")) + 
+  geom_boxplot(fill  = "grey") + 
+  theme_bw() + 
+  theme(panel.grid = element_blank(),
+        axis.title.x=element_blank()) + 
+  scale_y_continuous(limits = c(0,100), # set the limits of the y axis
+                     breaks = seq(0, 100, by = 10)) + # set the breaks
+  labs(y = "Age")  # y axis rangers from 0 to 100, by 10
+```
+
+
+Box plots provide a general overview of the data, but they do not let us visualize individual data points. A good rule of thumb when creating graphs is to maintain as much data transparency as possible. One way to do this is to overlay individual points on top of the box plot. To do this, we can add a point geom to the ggplot.
+```{r ggplot_box_overlay_points}
+ggplot(data = metadata, aes(y=age, x = "N = 234")) + 
+  geom_boxplot(fill  = "grey") + 
+  theme_bw() + 
+  theme(panel.grid = element_blank(),
+        axis.title.x=element_blank()) + 
+  scale_y_continuous(limits = c(0,100), 
+                     breaks = seq(0, 100, by = 10)) + 
+  labs(y = "Age") +
+  geom_point() # overlay points
+```
+
+Notice that it is difficult to discriminate between points due to overlap. It is possibel to mitigate this by adding random jitter the points. This can be accomplished using geom_jitter() instead of geom_point(). Geom_jitter allows us to control the amount of both horizontal (width) and vertical (height) jitter. It is important to not add jitter in a direction that affects the interpretaion of you data. In this example, we do not want to add vertical jitter, as this would affect the age of each of participant. 
+```{r ggplot_box_overlay_jitter}
+ggplot(data = metadata, aes(y=age, x = "N = 234")) + 
+  geom_boxplot(fill  = "grey") + 
+  theme_bw() + 
+  theme(panel.grid = element_blank(),
+        axis.title.x=element_blank()) + 
+  scale_y_continuous(limits = c(0,100), 
+                     breaks = seq(0, 100, by = 10)) + 
+  labs(y = "Age") +
+  geom_jitter(height = 0, width = 0.3) # overlay points
+```
+
+Some of the points still overlap. To add further clarity, we can reduce the opacity of points so that we can more clearly discriminate between individuals. Opacity is specified by alpha in geom_jitter. We can also adjust the size and colour of the points as well. 
+```{r ggplot_box_overlay_jitter_opacity}
+ggplot(data = metadata, aes(y=age, x = "N = 234")) + 
+  geom_boxplot(fill  = "grey") + 
+  theme_bw() + 
+  theme(panel.grid = element_blank(),
+        axis.title.x=element_blank()) + 
+  scale_y_continuous(limits = c(0,100), 
+                     breaks = seq(0, 100, by = 10)) + 
+  labs(y = "Age") +
+  geom_jitter(height = 0, width = 0.3, alpha = 0.7, size = 2) # overlay points
+```
+
+What if we want to examine age by sex? We can specify that the x-axis as sex to do this. 
+```{r ggplot_box_age_by_sex}
+metadata %>%
+  mutate(gender = ifelse(gender == "F", "Female", "Male")) %>% # rename gender to complete words
+  ggplot(aes(y=age, x = gender)) + 
+  geom_boxplot(fill = c("#de2352", "#079cb3"), alpha = 0.5) + 
+  theme_bw() + 
+  theme(panel.grid = element_blank(),
+        axis.title.x=element_blank()) + 
+  scale_y_continuous(limits = c(0,100), 
+                     breaks = seq(0, 100, by = 10)) + 
+  labs(y = "Age", x = "Sex") + # add in x-axis title
+  geom_jitter(height = 0, width = 0.3, alpha = 0.7, size = 2) # overlay points
+```
+We can also change the fill and outline of the points. When jitter points are overlayed this is accomplished by altering the colour of points in the aesthetics (aes) of geom_jitter and setting scale_colour_manual to the desired values. 
+```{r ggplot_box_age_by_sex_point_colour}
+# change fill in each geom
+metadata %>%
+  mutate(gender = ifelse(gender == "F", "Female", "Male")) %>% # rename gender to complete words
+  ggplot(aes(y=age, x = gender, fill = gender)) + 
+  geom_boxplot(alpha = 0.5, fill = c("#de2352", "#079cb3")) + 
+  geom_jitter(height = 0, aes(colour = gender)) +
+  scale_color_manual(values = c("#de2352", "#079cb3")) + 
+  theme_bw() + 
+  theme(panel.grid = element_blank(),
+        axis.title.x=element_blank()) + 
+  scale_y_continuous(limits = c(0,100), 
+                     breaks = seq(0, 100, by = 10)) + 
+  labs(y = "Age", x = "Sex")  
+```
+
+
+Notice that a legend has now been included in the graph. The legend does not add anything to our graph since sex is indicated on the x axis. We can remove the legend using the theme() function and setting legend.position = "none".
+```{r ggplot_box_age_by_sex_rm_legend}
+# change fill in each geom
+metadata %>%
+  mutate(gender = ifelse(gender == "F", "Female", "Male")) %>% # rename gender to complete words
+  ggplot(aes(y=age, x = gender, fill = gender)) + 
+  geom_boxplot(alpha = 0.5, fill = c("#de2352", "#079cb3")) + 
+  geom_jitter(height = 0, aes(colour = gender)) +
+  scale_color_manual(values = c("#de2352", "#079cb3")) + 
+  theme_bw() + 
+  theme(panel.grid = element_blank(),
+        axis.title.x=element_blank(),
+        legend.position = "none") + 
+  scale_y_continuous(limits = c(0,100), 
+                     breaks = seq(0, 100, by = 10)) + 
+  labs(y = "Age", x = "Sex")  
+```
+
+### ggplot density plot example
+
+We can also display age as a density plot. The overall code format is similar to the boxplot, however the geom we will be calling on is now geom_density()
+```{r ggplot_density_age}
+ggplot(data = metadata, aes(x=age)) +
+  geom_density(fill = "grey") +
+  theme_bw() +
+  theme(panel.grid = element_blank()) +
+  labs(y = "Density", x = "Age") +
+  scale_x_continuous(breaks = seq(0, 100, by = 10)) 
+
+# note that because age is now on the x axis, we must modify it using scale_x_continuous
+```
+
+
+### ggplot violin plot example
+
+Violin plots are a hybrid between a boxplot and a density plot. It shows the density of points in a boxplot. A density plot is really just a mirrored violin plot. Violin plots are gaining popularity for the ability to more transparently show the data. 
+```{r ggplot_violin_age}
+ggplot(data = metadata, aes(y=age, x = "N = 234")) +
+  geom_violin(fill = "grey", 
+              draw_quantiles = c(0.5), # specifies which quantiles to draw e.g. 0.25, 0.5, 0.75
+              scale = "count") + # how to scale density 
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        axis.title.x = element_blank()) +
+  scale_y_continuous(limits = c(0,100), 
+                     breaks = seq(0, 100, by = 10)) +
+  labs(y="Age") 
+
+# note that the violin plot is automatically trimmed to the limits of the data
+# this can be overridden by setting trim = F in geom_violin()
+```
+
+
+### ggplot bar plot example 
+
+Bar plots are a common way to visualize data and simple to make in ggplot. Let's look at an example by plotting the number of individuals with each type of respiratory infection.
+```{r barplot}
+ggplot(data = metadata, aes(x=viral_status)) +
+  geom_bar() +
+  theme_bw() +
+  labs(y="Count", x = "Respiratory infection") +
+  theme(panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank())
+```
+
+The x axis labels are not very informative. We can rename using the scale_x_discrete() function. When using this function, make sure your inputted labels are in the same order they should appear on the plot.
+
+```{r barplot_xaxis}
+ggplot(data = metadata, aes(x=viral_status)) +
+  geom_bar() +
+  theme_bw() +
+  labs(y="Count", x = "Respiratory infection") +
+  theme(panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank()) +
+  scale_x_discrete(labels = c("No virus detected", "Other virus", "SARS-COV2")) # input a vector into the labels
+```
+
+Perhaps we want to modify the size of the x axis labels as well. This can be accomplished in theme() by modifying the text element of the x axis text.
+```{r barplot_xaxis_label_size}
+ggplot(data = metadata, aes(x=viral_status)) +
+  geom_bar() +
+  theme_bw() +
+  labs(y="Count", x = "Respiratory infection") +
+  theme(panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        axis.text.x = element_text(size = 12)) + # change size
+  scale_x_discrete(labels = c("No virus detected", "Other virus", "SARS-COV2")) 
+```
+
+For practice, try to change the size of the y axis title.
+
+## Running basic statistical tests in R
+
+Base R has function to conduct many common types of statistical tests used in biology including t-tests, ANOVAs, linear regressions, logistic regressions, and much more. The most important thing to do before running any statistical test is to make sure your data is in the proper format. 
+
+### t-test example
+
+### ANOVA example
+
+### Linear regression example
+
+### Logistic regression example 
+
+## Visualing the results of statistical tests
